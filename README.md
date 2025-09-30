@@ -20,7 +20,7 @@ My HackNITR Projects
 | **Mobile App** | 📱 React Native (Android) |
 | **Website (Admin Dashboard)** | 💻 React + Tailwind CSS |
 | **Backend** | ⚡ Python , Fast API |
-| **Database** | 🗂️ MongoDB |
+| **Database** | 🗂️ MongoDB | Django |
 | **Maps & Notifications** | 🗺️ OLA Maps API, 🔔 Firebase Cloud Messaging |
 
 ---
