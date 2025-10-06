@@ -26,7 +26,7 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 @app.route("/admin_signup", methods=["POST"])
-def api_signup():
+def admin_signup():
     data = request.get_json(silent=True) or {}
     full_name = data.get("fullName", "")
     email = data.get("email", "")
@@ -60,7 +60,7 @@ def api_signup():
         return jsonify({"ok": False, "message": f"Signup error: {str(e)}"}), 500
 
 @app.route("/admin_login", methods=["POST"])
-def api_login():
+def admin_login():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "")
     password = data.get("password", "")
