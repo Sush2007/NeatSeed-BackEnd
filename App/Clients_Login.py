@@ -123,5 +123,4 @@ def client_login():
         return jsonify({"message": f"An error occurred: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # Use '0.0.0.0' for deployment readiness
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True)
