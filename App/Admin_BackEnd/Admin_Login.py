@@ -80,14 +80,13 @@ def admin_login():
         
         # Update the last login time in the admin_users table
         supabase.table("admin_users").update({
-            "last_login": datetime.now().isoformat()
-        }).eq("id", user_data["id"]).execute()
+        "last_login": datetime.now().isoformat()
+        }).eq("phone", user_data["phone"]).execute()
         
         return jsonify({
             "ok": True, 
             "message": "Login successful",
             "user": {
-                "id": user_data["id"],
                 "full_name": user_data["full_name"],
                 "email": user_data["email"],
                 "role": user_data["role"]
