@@ -31,10 +31,9 @@ def admin_signup():
     full_name = data.get("fullName", "")
     email = data.get("email", "")
     phone = data.get("phone", "")
-    role = data.get("role", "")
     password = data.get("password", "")
 
-    if not all([full_name, email, phone, role, password]):
+    if not all([full_name, email, phone, password]):
         return jsonify({"ok": False, "message": "All fields are required"}), 400
 
     try:
@@ -49,7 +48,6 @@ def admin_signup():
             "full_name": full_name,
             "email": email,
             "phone": phone,
-            "role": role,
             "password": hashed_password,
             "created_at": datetime.now().isoformat(),
             "last_login": None  # Add a field to track last login time
