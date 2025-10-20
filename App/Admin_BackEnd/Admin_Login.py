@@ -73,7 +73,10 @@ def admin_signup():
         
         return jsonify({"ok": True, "message": "Account created successfully"})
     except Exception as e:
-        return jsonify({"ok": False, "message": f"Signup error: {str(e)}"}), 500
+        # 🛑 THIS WILL CATCH CRASHES WITHIN THE ROUTE 🛑
+        print(f"!!! CRASH IN ADMIN_SIGNUP ROUTE !!! Error: {e}", file=sys.stderr)
+        # Return a generic 500 JSON error so the frontend gets a valid (though error) response
+        return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
 
 @app.route("/admin_login", methods=["POST"])
 def admin_login():
@@ -91,7 +94,7 @@ def admin_login():
         
         if not user.data:
             return jsonify({"ok": False, "message": "Invalid email or password"}), 401
-
+    
         user_data = user.data[0]
         
         # Update the last login time in the admin_users table
@@ -109,7 +112,10 @@ def admin_login():
             }
         })
     except Exception as e:
-        return jsonify({"ok": False, "message": f"Login error: {str(e)}"}), 500
+         # 🛑 THIS WILL CATCH CRASHES WITHIN THE ROUTE 🛑
+        print(f"!!! CRASH IN ADMIN_LOGIN ROUTE !!! Error: {e}", file=sys.stderr)
+         # Return a generic 500 JSON error so the frontend gets a valid (though error) response
+        return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
