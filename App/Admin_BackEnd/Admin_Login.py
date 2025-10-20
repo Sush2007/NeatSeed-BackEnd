@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime
 import os
 import sys
+import traceback
 
 
 app = Flask(__name__)
@@ -117,5 +118,18 @@ def admin_login():
          # Return a generic 500 JSON error so the frontend gets a valid (though error) response
         return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
 
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    # Log the full traceback to stderr (Render logs)
+    traceback.print_exc(file=sys.stderr)
+    
+    # Return a generic 500 error response
+    return jsonify({
+        "ok": False,
+        "message": "Internal Server Error. Please check backend logs for details."
+    }), 500
+
+    
 if __name__ == "__main__":
     app.run(debug=True)
