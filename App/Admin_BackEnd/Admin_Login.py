@@ -130,6 +130,13 @@ def handle_error(e):
         "message": "Internal Server Error. Please check backend logs for details."
     }), 500
 
+    # In Admin_Login.py
+
+@app.route("/")
+def health_check():
+    # Render's health check will hit this and get a 200 OK
+    return "Server is running and healthy!", 200 
+    # Return a status code 200 to confirm success
     
 if __name__ == "__main__":
     app.run(debug=True)
