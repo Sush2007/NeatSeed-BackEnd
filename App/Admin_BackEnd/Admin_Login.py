@@ -4,6 +4,7 @@ from supabase import create_client, Client
 import hashlib
 from datetime import datetime
 import os
+import sys
 
 
 app = Flask(__name__)
@@ -13,10 +14,30 @@ CORS(app, origins=["https://neatseed.onrender.com"])
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
+try:
+    if not SUPABASE_URL:
+        # Check 1: Missing URL
+        raise ValueError("FATAL ERROR: SUPABASE_URL is missing from environment variables.")
+    
+    if not SUPABASE_KEY:
+        # Check 2: Missing Key
+        raise ValueError("FATAL ERROR: SUPABASE_KEY is missing from environment variables.")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Check 3: Attempt to create the client (This is where network/connection errors happen)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("SUCCESS: Supabase client initialized.") # Log success
+
+except Exception as e:
+    # 2. Capture and print the full error message
+    print("--------------------------------------------------", file=sys.stderr)
+    print(f"!!! FATAL CRASH DURING SUPABASE SETUP !!!", file=sys.stderr)
+    print(f"ERROR TYPE: {type(e).__name__}", file=sys.stderr)
+    print(f"ERROR MESSAGE: {e}", file=sys.stderr)
+    print("--------------------------------------------------", file=sys.stderr)
+    # Use sys.stderr to make sure it appears prominently in Render logs
+    
+    # Optional: Exit the application gracefully if initialization fails
+    sys.exit(1)
 
 def hash_password(password):
     """Simple password hashing using SHA256"""
