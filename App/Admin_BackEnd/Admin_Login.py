@@ -7,7 +7,7 @@ import os
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, origins=["https://neatseed.onrender.com"])
 
 # Supabase configuration from environment variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
