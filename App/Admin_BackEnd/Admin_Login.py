@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["https://neatseed.onrender.com"])
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Supabase configuration from environment variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
