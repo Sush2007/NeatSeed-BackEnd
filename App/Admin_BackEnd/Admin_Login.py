@@ -12,8 +12,8 @@ app = Flask(__name__)
 CORS(app, origins=["https://neatseed.onrender.com"])
 
 # Supabase configuration from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("ADMIN_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("ADMIN_SUPABASE_KEY")
 
 try:
     if not SUPABASE_URL:
@@ -49,10 +49,9 @@ def admin_signup():
     data = request.get_json(silent=True) or {}
     full_name = data.get("fullName", "")
     email = data.get("email", "")
-    phone = data.get("phone", "")
     password = data.get("password", "")
 
-    if not all([full_name, email, phone, password]):
+    if not all([full_name, email, password]):
         return jsonify({"ok": False, "message": "All fields are required"}), 400
 
     try:
@@ -66,7 +65,6 @@ def admin_signup():
         result = supabase.table("admin_users").insert({
             "full_name": full_name,
             "email": email,
-            "phone": phone,
             "password": hashed_password,
             "created_at": datetime.now().isoformat(),
             "last_login": None  # Add a field to track last login time
@@ -101,7 +99,7 @@ def admin_login():
         # Update the last login time in the admin_users table
         supabase.table("admin_users").update({
         "last_login": datetime.now().isoformat()
-        }).eq("phone", user_data["phone"]).execute()
+        }).eq("email", user_data["email"]).execute()
         
         return jsonify({
             "ok": True, 
