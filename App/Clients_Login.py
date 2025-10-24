@@ -4,24 +4,20 @@ from supabase import create_client, Client
 import hashlib
 from datetime import datetime
 import os
-from dotenv import load_dotenv
+import sys
 
-# Load environment variables from .env file
-load_dotenv()
+FRONTEND_ORIGIN = os.getenv("FRONTEND_CLIENTS_URL", "*")  # Default to "*" if not set
+app = Flask(__name__)
+CORS(app, origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN else "*")
 
 # Supabase configuration - YOU NEED TO REPLACE THESE WITH YOUR ACTUAL SUPABASE URL AND KEY
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "YOUR_SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "YOUR_SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Initialize Flask app
-app = Flask(__name__)
-# Configure CORS to allow access from the client URL
-CORS(app, origins=["https://neatseed-client.onrender.com"])
 
 
 # Function to hash a password
@@ -29,10 +25,6 @@ def hash_password(password):
     """Simple password hashing using SHA256"""
     # hashlib.sha256(password.encode()).hexdigest() returns a string, no need for .decode('utf-8')
     return hashlib.sha256(password.encode()).hexdigest()
-
-def check_password(plain_password, hashed_password):
-    return hash_password(plain_password) == hashed_password
-
 
 @app.route('/user_signup', methods=['POST'])
 def user_signup():
@@ -44,7 +36,7 @@ def user_signup():
     password = data.get("password", "")
     address = data.get("address", "")
 
-    if not all([full_name, email, phone, address, role, password]):
+    if not all([full_name, phone, address, role, password]):
         return jsonify({"message": "All fields are required"}), 400
     
     # --- Role-based Table Selection ---
@@ -53,14 +45,19 @@ def user_signup():
     elif role == "driver":
         table_name = "driver_users"
     else:
-        return jsonify({"message": "Invalid role specified. Must be 'client' or 'driver'."}), 400
+        return jsonify({"message": "Invalid role specified"}), 400
 
     try:
         # Check if email already exists in the selected table
-        existing_user_check = supabase.table(table_name).select("email").eq("email", email).execute()
-        if existing_user_check.data:
+        existing_email_check = supabase.table(table_name).select("email").eq("email", email).execute()
+        existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
+
+        if existing_email_check.data:
             return jsonify({"ok": False, "message": f"Email already exists"}), 400
-            
+        
+        if existing_phone_check.data:
+            return jsonify({"ok": False, "message": f"Phone number already exists"}), 400
+
         # Hash the password
         hashed_password = hash_password(password) # Corrected: Removed .decode('utf-8')
 
@@ -94,11 +91,6 @@ def client_login():
 
     if not email or not password:
         return jsonify({"message": "Email and password are required"}), 400
-
-    # The original code searches a table named 'users', which is inconsistent with the 'client_users' and 'driver_users' tables. 
-    # For a full solution, you would need to:
-    # 1. Ask the user's role during login, or
-    # 2. Check both 'client_users' and 'driver_users' tables for the email.
     
     # Assuming 'check_password' is defined elsewhere (it's missing in the original code)
     def check_password(plain_password, hashed_password):
@@ -121,6 +113,12 @@ def client_login():
              
     except Exception as e:
         return jsonify({"message": f"An error occurred: {str(e)}"}), 500
+    
+@app.route("/")
+def health_check():
+    # Render's health check will hit this and get a 200 OK
+    return "Server is running and healthy!", 200 
+    # Return a status code 200 to confirm success
 
 if __name__ == '__main__':
     app.run(debug=True)

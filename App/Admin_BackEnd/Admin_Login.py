@@ -5,15 +5,14 @@ import hashlib
 from datetime import datetime
 import os
 import sys
-import traceback
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ADMIN_URL", "*")  # Default to "*" if not set
 app = Flask(__name__)
 CORS(app, origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN else "*")
 
 # Supabase configuration from environment variables
-SUPABASE_URL = os.getenv("ADMIN_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("ADMIN_SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 try:
     if not SUPABASE_URL:
@@ -27,18 +26,9 @@ try:
     # Check 3: Attempt to create the client (This is where network/connection errors happen)
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("SUCCESS: Supabase client initialized.") # Log success
-
 except Exception as e:
-    # 2. Capture and print the full error message
-    print("--------------------------------------------------", file=sys.stderr)
-    print(f"!!! FATAL CRASH DURING SUPABASE SETUP !!!", file=sys.stderr)
-    print(f"ERROR TYPE: {type(e).__name__}", file=sys.stderr)
-    print(f"ERROR MESSAGE: {e}", file=sys.stderr)
-    print("--------------------------------------------------", file=sys.stderr)
-    # Use sys.stderr to make sure it appears prominently in Render logs
-    
-    # Optional: Exit the application gracefully if initialization fails
-    sys.exit(1)
+    print(f"FATAL ERROR: Could not initialize Supabase client. Error: {e}", file=sys.stderr)
+    sys.exit(1)  # Exit the application if Supabase client cannot be initialized
 
 def hash_password(password):
     """Simple password hashing using SHA256"""
@@ -47,11 +37,10 @@ def hash_password(password):
 @app.route("/admin_signup", methods=["POST"])
 def admin_signup():
     data = request.get_json(silent=True) or {}
-    full_name = data.get("fullName", "")
     email = data.get("email", "")
     password = data.get("password", "")
 
-    if not all([full_name, email, password]):
+    if not all([email, password]):
         return jsonify({"ok": False, "message": "All fields are required"}), 400
 
     try:
@@ -63,7 +52,6 @@ def admin_signup():
         # Hash password and insert user
         hashed_password = hash_password(password)
         result = supabase.table("admin_users").insert({
-            "full_name": full_name,
             "email": email,
             "password": hashed_password,
             "created_at": datetime.now().isoformat(),
@@ -105,7 +93,6 @@ def admin_login():
             "ok": True, 
             "message": "Login successful",
             "user": {
-                "full_name": user_data["full_name"],
                 "email": user_data["email"],
                 "role": user_data["role"]
             }
@@ -116,19 +103,6 @@ def admin_login():
          # Return a generic 500 JSON error so the frontend gets a valid (though error) response
         return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
 
-
-@app.errorhandler(Exception)
-def handle_error(e):
-    # Log the full traceback to stderr (Render logs)
-    traceback.print_exc(file=sys.stderr)
-    
-    # Return a generic 500 error response
-    return jsonify({
-        "ok": False,
-        "message": "Internal Server Error. Please check backend logs for details."
-    }), 500
-
-    # In Admin_Login.py
 
 @app.route("/")
 def health_check():
