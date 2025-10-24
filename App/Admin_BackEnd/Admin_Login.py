@@ -7,9 +7,9 @@ import os
 import sys
 import traceback
 
-
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ADMIN_URL", "*")  # Default to "*" if not set
 app = Flask(__name__)
-CORS(app, origins=["https://neatseed.onrender.com"])
+CORS(app, origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN else "*")
 
 # Supabase configuration from environment variables
 SUPABASE_URL = os.getenv("ADMIN_SUPABASE_URL")
