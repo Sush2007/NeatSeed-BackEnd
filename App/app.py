@@ -1,6 +1,7 @@
 import os
 import sys
 import traceback
+from typing import Optional
 from flask import Flask, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
@@ -11,6 +12,10 @@ from .clients_routes import client_bp
 
 app = Flask(__name__)
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = None
+
 # --- Get BOTH frontend URLs from environment ---
 ADMIN_ORIGIN = os.getenv("FRONTEND_ADMIN_URL", "*")
 CLIENT_ORIGIN = os.getenv("FRONTEND_CLIENTS_URL", "*")
@@ -18,9 +23,6 @@ CLIENT_ORIGIN = os.getenv("FRONTEND_CLIENTS_URL", "*")
 # --- Setup CORS to allow BOTH frontends ---
 CORS(app, origins=[ADMIN_ORIGIN, CLIENT_ORIGIN])
 
-# --- Create ONE Supabase client for the whole app ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 try:
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -55,4 +57,7 @@ def handle_error(e):
     }), 500
 
 if __name__ == "__main__":
+    if supabase is None:
+         print("ERROR: Supabase client not initialized. Cannot run.", file=sys.stderr)
+         sys.exit(1)
     app.run(debug=True)
