@@ -30,9 +30,6 @@ except Exception as e:
     print(f"!!! FATAL CRASH DURING SUPABASE SETUP !!! Error: {e}", file=sys.stderr)
     sys.exit(1) # Exit if Supabase fails
 
-# --- 4. IMPORT AND REGISTER BLUEPRINTS *AFTER* supabase is created ---
-# **** THIS IS THE MOST IMPORTANT PART FOR THE FIX ****
-# **** THESE IMPORTS MUST BE BELOW THE supabase = create_client(...) line ****
 from .admin_routes import admin_bp
 from .clients_routes import client_bp
 
