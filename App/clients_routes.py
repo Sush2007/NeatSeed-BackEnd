@@ -30,13 +30,18 @@ def user_signup():
         table_name = "driver_users"
     else:
         return jsonify({"message": "Invalid role specified"}), 400
-
+    
     try:
-        # ... (Your full try/except block for signup) ...
-        # (Make sure to use the imported hash_password)
+        if email: 
+            existing_email_check = supabase.table(table_name).select("email").eq("email", email).execute()
+            if existing_email_check.data:
+                return jsonify({"ok": False, "message": f"Email already exists in {table_name}"}), 400
+
+            existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
+            if existing_phone_check.data:
+                return jsonify({"ok": False, "message": f"Phone number already exists in {table_name}"}), 400
+            
         hashed_password = hash_password(password)
-        
-        # (Your code to check for existing email/phone)
         
         user_data = {
             "full_name": full_name,
@@ -54,7 +59,6 @@ def user_signup():
         print(f"Error during client signup: {e}")
         return jsonify({"message": f"An error occurred: {str(e)}"}), 500
 
-# This route will be at /client/login
 @client_bp.route('/login', methods=['POST'])
 def client_login():
     data = request.get_json(silent=True) or {}
@@ -67,10 +71,6 @@ def client_login():
 
     try:
         hashed_password = hash_password(password)
-        
-        # Determine table based on identifier (or you can add a 'role' to the login form)
-        # This example checks both tables, which is not ideal but works.
-        # A better way is to have your frontend send the 'role' (client/driver)
         
         user_data = None
         table_to_check = None
