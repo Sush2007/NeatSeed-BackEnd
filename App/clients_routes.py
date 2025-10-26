@@ -37,9 +37,9 @@ def user_signup():
             if existing_email_check.data:
                 return jsonify({"ok": False, "message": f"Email already exists in {table_name}"}), 400
 
-            existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
-            if existing_phone_check.data:
-                return jsonify({"ok": False, "message": f"Phone number already exists in {table_name}"}), 400
+        existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
+        if existing_phone_check.data:
+            return jsonify({"ok": False, "message": f"Phone number already exists in {table_name}"}), 400
             
         hashed_password = hash_password(password)
         
