@@ -65,7 +65,6 @@ def admin_login():
             "message": "Login successful",
             "user": {
                 "email": user_data["email"],
-                "role": user_data["role"]
             }
         })
     except Exception as e:
