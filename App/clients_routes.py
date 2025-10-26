@@ -24,7 +24,7 @@ def user_signup():
     password = data.get("password", "")
     address = data.get("address", "")
     
-    if role == "client":
+    if role == "user":
         table_name = "client_users"
     elif role == "driver":
         table_name = "driver_users"
