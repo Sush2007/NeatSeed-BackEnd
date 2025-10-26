@@ -12,6 +12,9 @@ client_bp = Blueprint('client_bp', __name__)
 # This route will be at /client/signup
 @client_bp.route('/signup', methods=['POST'])
 def user_signup():
+    print("--- POST /client/signup route function STARTED ---", file=sys.stderr)
+    print(f"Request Headers: {request.headers}", file=sys.stderr)
+    print(f"Request Raw Data: {request.data}", file=sys.stderr)
     data = request.get_json(silent=True) or {}
     # ... (Your signup logic from Clients_Login.py) ...
     full_name = data.get("fullName", "")
