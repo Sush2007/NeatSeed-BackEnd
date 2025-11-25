@@ -1,63 +1,76 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 
-# --- Import the main supabase client and hash function ---
-from .app import supabase
-from .utils import hash_password
+# CHANGE: Import supabase from database.py
+from .database import supabase
+from .utils import hash_password, generate_otp, send_email_otp
 
-# --- Create the Blueprint ---
 client_bp = Blueprint('client_bp', __name__)
 
-# This route will be at /client/signup
 @client_bp.route('/signup', methods=['POST'])
 def user_signup():
-    print("--- POST /client/signup route function STARTED ---", file=sys.stderr)
-    print(f"Request Headers: {request.headers}", file=sys.stderr)
-    print(f"Request Raw Data: {request.data}", file=sys.stderr)
     data = request.get_json(silent=True) or {}
-    # ... (Your signup logic from Clients_Login.py) ...
-    full_name = data.get("fullName", "")
-    email = data.get("email", "")
-    phone = data.get("phone", "")
+    email = data.get("email")
+    phone = data.get("phone")
     role = data.get("role", "").lower()
-    password = data.get("password", "")
-    address = data.get("address", "")
-    
-    if role == "user":
-        table_name = "client_users"
-    elif role == "driver":
-        table_name = "driver_users"
-    else:
-        return jsonify({"message": "Invalid role specified"}), 400
+    password = data.get("password")
+    full_name = data.get("fullName")
+    address = data.get("address")
+
+    table_name = "client_users" if role == "user" else "driver_users"
     
     try:
-        if email: 
-            existing_email_check = supabase.table(table_name).select("email").eq("email", email).execute()
-            if existing_email_check.data:
-                return jsonify({"ok": False, "message": f"Email already exists in {table_name}"}), 400
+        # 1. Check Duplicates
+        if supabase.table(table_name).select("email").eq("email", email).execute().data:
+            return jsonify({"ok": False, "message": "Email exists"}), 400
 
-        existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
-        if existing_phone_check.data:
-            return jsonify({"ok": False, "message": f"Phone number already exists in {table_name}"}), 400
-            
-        hashed_password = hash_password(password)
-        
-        user_data = {
-            "full_name": full_name,
-            "email": email,
-            "phone": phone,
-            "password": hashed_password,
-            "address": address,
+        # 2. Insert User (Verified = False)
+        hashed = hash_password(password)
+        supabase.table(table_name).insert({
+            "full_name": full_name, "email": email, "phone": phone,
+            "password": hashed, "address": address, "is_verified": False,
             "created_at": datetime.now().isoformat()
-        }
-        supabase.table(table_name).insert(user_data).execute()
-        
-        return jsonify({"ok": True, "message": f"Account created successfully for role: {role}"})
-    
+        }).execute()
+
+        # 3. Send OTP
+        otp = generate_otp()
+        if send_email_otp(email, otp):
+            expiry = (datetime.now() + timedelta(minutes=5)).isoformat()
+            supabase.table("otp_codes").upsert({
+                "email": email, "otp": otp, "expires_at": expiry
+            }).execute()
+            return jsonify({"ok": True, "message": "OTP sent"})
+            
+        return jsonify({"ok": False, "message": "Failed to send OTP"}), 500
+
     except Exception as e:
-        print(f"Error during client signup: {e}")
-        return jsonify({"message": f"An error occurred: {str(e)}"}), 500
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+@client_bp.route("/verify-otp", methods=["POST"])
+def verify_client_otp():
+    data = request.get_json()
+    email = data.get("email")
+    otp = data.get("otp")
+    role = data.get("role", "user") # Passed from frontend
+
+    table_name = "client_users" if role == "user" else "driver_users"
+
+    try:
+        # Verify OTP
+        record = supabase.table("otp_codes").select("*").eq("email", email).execute()
+        if not record.data or record.data[0]['otp'] != otp:
+            return jsonify({"ok": False, "message": "Invalid OTP"}), 400
+
+        # Activate User
+        supabase.table(table_name).update({"is_verified": True}).eq("email", email).execute()
+        
+        # Clean OTP
+        supabase.table("otp_codes").delete().eq("email", email).execute()
+        
+        return jsonify({"ok": True, "message": "Verified"})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 @client_bp.route('/login', methods=['POST'])
 def client_login():
