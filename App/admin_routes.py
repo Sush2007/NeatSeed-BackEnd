@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import sys
 
+
 # --- Import the main supabase client and hash function ---
 from .app import supabase 
 from .utils import hash_password
@@ -17,7 +18,6 @@ def admin_signup():
     email = data.get("email", "")
     password = data.get("password", "")
     
-    # ... (Rest of your signup logic) ...
     
     try:
         # Check if email already exists
