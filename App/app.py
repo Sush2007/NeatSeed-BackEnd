@@ -17,9 +17,5 @@ from .clients_routes import client_bp
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(client_bp, url_prefix='/client')
 
-@app.route("/")
-def health_check():
-    return "Server Running", 200
-
 if __name__ == "__main__":
     app.run(debug=True)
