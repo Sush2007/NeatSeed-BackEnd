@@ -56,15 +56,22 @@ def user_signup():
         }
         supabase.table(table_name).insert(user_data).execute()
         
-        # Send OTP via email
+        email_sent = False
         if email:
-            send_email_otp(email, otp)
+            email_sent = send_email_otp(email, otp)
         
-        return jsonify({"ok": True, "message": f"Account created successfully. Please verify your email."})
-    
+        # Check if email actually went through
+        if not email_sent:
+            return jsonify({
+                "ok": True, # Keep True so frontend redirects (optional strategy)
+                "message": "Account created, but OTP email failed to send. Please contact support."
+            })
+        
+        return jsonify({"ok": True, "message": f"Account created. OTP sent to {email}"})
+
     except Exception as e:
-        print(f"Error during client signup: {e}")
-        return jsonify({"message": f"An error occurred: {str(e)}"}), 500
+        print(f"SIGNUP ERROR: {e}") # Print error to terminal
+        return jsonify({"ok": False, "message": f"Server Error: {str(e)}"}), 500
 
 @client_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
