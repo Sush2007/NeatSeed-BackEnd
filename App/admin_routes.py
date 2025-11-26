@@ -21,7 +21,7 @@ def admin_signup():
         # Check if email already exists
         existing_user = supabase.table("admin_users").select("email").eq("email", email).execute()
         if existing_user.data:
-            return jsonify({"ok": False, "message": "Email already exists"}), 400
+            return jsonify({"ok": False, "message": f"Email already exists"}), 400
 
         hashed_password = hash_password(password)
         otp = generate_otp()
