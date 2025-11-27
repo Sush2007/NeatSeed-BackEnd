@@ -12,66 +12,68 @@ client_bp = Blueprint('client_bp', __name__)
 # This route will be at /client/signup
 @client_bp.route('/signup', methods=['POST'])
 def user_signup():
-    print("--- POST /client/signup route function STARTED ---", file=sys.stderr)
-    print(f"Request Headers: {request.headers}", file=sys.stderr)
-    print(f"Request Raw Data: {request.data}", file=sys.stderr)
-    data = request.get_json(silent=True) or {}
-    
-    full_name = data.get("fullName", "")
-    email = data.get("email", "")
-    phone = data.get("phone", "")
-    role = data.get("role", "").lower()
-    password = data.get("password", "")
-    address = data.get("address", "")
-    
-    if role == "user":
-        table_name = "client_users"
-    elif role == "driver":
-        table_name = "driver_users"
-    else:
-        return jsonify({"message": "Invalid role specified"}), 400
-    
     try:
-        if email: 
-            existing_email_check = supabase.table(table_name).select("email").eq("email", email).execute()
-            if existing_email_check.data:
-                return jsonify({"ok": False, "message": f"Email already exists in {table_name}"}), 400
+        data = request.get_json(silent=True) or {}
+        full_name = data.get('fullName') 
+        email = data.get('email')
+        phone = data.get('phone') # Added phone capture
+        password = data.get('password')
+        address = data.get('address') # Added address capture
+        role = data.get('role', 'user').lower()
+        
+        print(f"DEBUG: Signup request for {email} as {role}")
 
-        existing_phone_check = supabase.table(table_name).select("phone").eq("phone", phone).execute()
-        if existing_phone_check.data:
-            return jsonify({"ok": False, "message": f"Phone number already exists in {table_name}"}), 400
-            
+        # 1. Determine Table Name
+        if role == 'user':
+            table_name = 'client_users'
+        elif role == 'driver':
+            table_name = 'driver_users'
+        else:
+            return jsonify({"error": "Invalid role specified"}), 400
+
+        # 2. Validation
+        if not email or not password or not full_name:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # 3. Check if user exists (in the CORRECT table)
+        existing_user = supabase.table(table_name).select("*").eq('email', email).execute()
+        if existing_user.data:
+            return jsonify({"error": f"User already exists in {table_name}"}), 400
+
         hashed_password = hash_password(password)
         otp = generate_otp()
-        
+
+        # 4. Prepare Data (Match your database schema)
         user_data = {
-            "full_name": full_name,
+            "full_name": full_name, # Ensure column name matches DB (full_name vs name)
             "email": email,
             "phone": phone,
-            "password": hashed_password,
             "address": address,
-            "created_at": datetime.now().isoformat(),
+            "password": hashed_password,
+            "role": role,
             "otp": otp,
-            "is_verified": False
+            "is_verified": False,
+            "created_at": datetime.now().isoformat()
         }
+        
+        # 5. Insert into DB (The CORRECT table)
         supabase.table(table_name).insert(user_data).execute()
         
-        email_sent = False
-        if email:
-            email_sent = send_email_otp(email, otp)
+        # 6. Send Email
+        email_status = send_email_otp(email, otp)
         
-        # Check if email actually went through
-        if not email_sent:
+        if not email_status:
+            print("WARNING: Database insert success, but Email failed.")
             return jsonify({
-                "ok": True, # Keep True so frontend redirects (optional strategy)
-                "message": "Account created, but OTP email failed to send. Please contact support."
-            })
-        
-        return jsonify({"ok": True, "message": f"Account created. OTP sent to {email}"})
+                "message": "Account created. (Email sending failed - check server logs)",
+                "redirect": True 
+            }), 200
+
+        return jsonify({"message": "Signup successful! OTP sent.", "redirect": True}), 201
 
     except Exception as e:
-        print(f"SIGNUP ERROR: {e}") # Print error to terminal
-        return jsonify({"ok": False, "message": f"Server Error: {str(e)}"}), 500
+        print(f"!!! CRITICAL SERVER ERROR: {str(e)}")
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 @client_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
@@ -112,7 +114,6 @@ def verify_otp():
 @client_bp.route('/login', methods=['POST'])
 def client_login():
     data = request.get_json(silent=True) or {}
-    # --- This is the new logic for Email or Phone ---
     identifier = data.get("identifier") 
     password = data.get("password")
 

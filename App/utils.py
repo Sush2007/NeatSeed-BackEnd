@@ -1,43 +1,53 @@
-import hashlib
 import smtplib
+import os
 import random
 import string
-import os
+import hashlib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv # Ensure you have python-dotenv installed
+from dotenv import load_dotenv
 
-# Explicitly load .env file
+# 1. FORCE LOAD ENV VARIABLES
 load_dotenv()
 
 def hash_password(password):
-    if not password:
-        return None
     return hashlib.sha256(password.encode()).hexdigest()
 
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
 
 def send_email_otp(recipient_email, otp):
+    # 2. DEBUGGING: Print credentials to terminal (Check your terminal when you run this!)
     sender_email = os.getenv("MAIL_USERNAME")
     sender_password = os.getenv("MAIL_PASSWORD")
+    
+    print(f"DEBUG: Attempting to send email from {sender_email}...")
 
-    # 1. Check if credentials exist
     if not sender_email or not sender_password:
-        print("!!! EMAIL ERROR: Missing MAIL_USERNAME or MAIL_PASSWORD in .env !!!")
+        print("!!! ERROR: MAIL_USERNAME or MAIL_PASSWORD is missing in .env !!!")
         return False
 
-    subject = "NeatSeed Verification Code"
-    body = f"Your OTP is: {otp}"
+    subject = "Your NeatSeed Verification Code"
+    
+    # Professional HTML Template
+    body = f"""
+    <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+        <h2 style="color: #2E7D32;">Verify your NeatSeed Account</h2>
+        <p>Hello,</p>
+        <p>Your verification code is:</p>
+        <h1 style="background-color: #f1f8e9; padding: 10px; display: inline-block; color: #1b5e20; letter-spacing: 5px;">{otp}</h1>
+        <p>This code expires in 10 minutes.</p>
+    </div>
+    """
 
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = recipient_email
     msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(body, 'html'))
 
     try:
-        # 2. Use safe connection block
+        # 3. USE SSL (Port 465) - More reliable for Gmail
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, recipient_email, msg.as_string())
@@ -45,6 +55,5 @@ def send_email_otp(recipient_email, otp):
         print(f"SUCCESS: Email sent to {recipient_email}")
         return True
     except Exception as e:
-        # 3. Print the actual error so you can see it in your terminal
-        print(f"!!! SMTP ERROR: {str(e)}")
+        print(f"!!! EMAIL FAILED: {str(e)}")
         return False
