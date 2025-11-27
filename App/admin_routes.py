@@ -80,6 +80,40 @@ def verify_otp():
         print(f"Error verifying OTP: {e}")
         return jsonify({"ok": False, "message": f"Verification failed: {str(e)}"}), 500
 
+@admin_bp.route('/resend-otp', methods=['POST'])
+def resend_otp_route():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"ok": False, "message": "Email is required"}), 400
+
+    try:
+        # 1. Check if Admin exists
+        user = supabase.table("admin_users").select("*").eq("email", email).execute()
+        if not user.data:
+            return jsonify({"ok": False, "message": "Admin user not found"}), 404
+
+        # 2. Generate New OTP
+        new_otp = generate_otp()
+
+        # 3. Update DB
+        supabase.table("admin_users").update({
+            "otp": new_otp
+        }).eq("email", email).execute()
+
+        # 4. Send Email (Fail-Safe)
+        email_sent = send_email_otp(email, new_otp)
+
+        if email_sent:
+            return jsonify({"ok": True, "message": "New OTP resent successfully"})
+        else:
+            return jsonify({"ok": True, "message": "OTP generated but email failed (check logs)"})
+
+    except Exception as e:
+        print(f"ADMIN RESEND ERROR: {e}")
+        return jsonify({"ok": False, "message": "Server error"}), 500
+
 # This route will be at /admin/login
 @admin_bp.route("/login", methods=["POST"])
 def admin_login():

@@ -160,3 +160,45 @@ def client_login():
     except Exception as e:
         print(f"!!! CRASH IN CLIENT_LOGIN ROUTE !!! Error: {e}")
         return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
+
+@client_bp.route('/resend-otp', methods=['POST'])
+def resend_otp_route():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email")
+    role = data.get("role", "").lower()
+
+    if not email:
+        return jsonify({"ok": False, "message": "Email is required"}), 400
+
+    # 1. Determine Table
+    if role == 'user':
+        table_name = 'client_users'
+    elif role == 'driver':
+        table_name = 'driver_users'
+    else:
+        return jsonify({"ok": False, "message": "Invalid role"}), 400
+
+    try:
+        # 2. Check if user exists
+        user = supabase.table(table_name).select("*").eq("email", email).execute()
+        if not user.data:
+            return jsonify({"ok": False, "message": "User not found"}), 404
+
+        # 3. Generate New OTP
+        new_otp = generate_otp()
+
+        # 4. Update DB with new OTP
+        supabase.table(table_name).update({
+            "otp": new_otp
+        }).eq("email", email).execute()
+
+        # 5. Send Email (using our fail-safe utility)
+        email_sent = send_email_otp(email, new_otp)
+
+        if email_sent:
+            return jsonify({"ok": True, "message": "OTP resent successfully"})
+        else:
+            return jsonify({"ok": True, "message": "OTP generated but email failed (check logs)"})
+    except Exception as e:
+        print(f"!!! CRASH IN RESEND_OTP ROUTE !!! Error: {e}")
+        return jsonify({"ok": False, "message": f"Internal server error. Log: {str(e)}"}), 500
