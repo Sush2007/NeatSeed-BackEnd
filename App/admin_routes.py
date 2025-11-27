@@ -21,7 +21,7 @@ def admin_signup():
         try:
             existing = supabase.table("admin_users").select("email").eq("email", email).execute()
             if existing.data:
-                return jsonify({"ok": False, "message": "Email already exists"}), 400
+                return jsonify({"ok": False, "message": f"Email already exists"}), 400
         except Exception as db_err:
              print(f"DB CHECK IGNORED: {db_err}")
 

@@ -27,7 +27,7 @@ def user_signup():
         try:
             existing = supabase.table(table_name).select("email").eq("email", email).execute()
             if existing.data:
-                return jsonify({"ok": False, "message": "User already exists"}), 400
+                return jsonify({"ok": False, "message": f"email already exists"}), 400
         except:
             pass
 
@@ -39,7 +39,6 @@ def user_signup():
             "full_name": full_name, 
             "email": email,
             "password": hashed_password,
-            "role": role,
             "phone": phone,
             "address": address,
             "otp": otp,
