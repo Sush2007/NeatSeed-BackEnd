@@ -42,7 +42,7 @@ def user_signup():
             "phone": phone,
             "address": address,
             "otp": otp,
-            "is_verified": False, # <--- Saved as Pending
+            "is_verified": False, 
             "created_at": datetime.now().isoformat()
         }
         
