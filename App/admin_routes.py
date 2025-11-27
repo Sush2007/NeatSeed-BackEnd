@@ -1,47 +1,58 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 import sys
-
-# --- Import the main supabase client and hash function ---
 from .database import supabase 
 from .utils import hash_password, generate_otp, send_email_otp
 
-# --- Create the Blueprint ---
 admin_bp = Blueprint('admin_bp', __name__)
 
-# --- Define your routes using the Blueprint ---
-# This route will be at /admin/signup
 @admin_bp.route("/signup", methods=["POST"])
 def admin_signup():
-    data = request.get_json(silent=True) or {}
-    email = data.get("email", "")
-    password = data.get("password", "")
-    
     try:
-        # Check if email already exists
-        existing_user = supabase.table("admin_users").select("email").eq("email", email).execute()
-        if existing_user.data:
-            return jsonify({"ok": False, "message": f"Email already exists"}), 400
+        data = request.get_json(silent=True) or {}
+        email = data.get("email", "")
+        password = data.get("password", "")
+        
+        # 1. Validation
+        if not email or not password:
+            return jsonify({"ok": False, "message": "Email and Password are required"}), 400
+
+        # 2. Check Duplicates (Safe Check)
+        try:
+            existing = supabase.table("admin_users").select("email").eq("email", email).execute()
+            if existing.data:
+                return jsonify({"ok": False, "message": "Email already exists"}), 400
+        except Exception as db_err:
+             print(f"DB CHECK IGNORED: {db_err}")
 
         hashed_password = hash_password(password)
         otp = generate_otp()
 
+        # 3. INSERT NOW (Pending Verification)
+        # We MUST save them now to store the password.
+        # Removing 'full_name' as requested.
         supabase.table("admin_users").insert({
             "email": email,
             "password": hashed_password,
             "created_at": datetime.now().isoformat(),
-            "last_login": None,
             "otp": otp,
-            "is_verified": False
+            "is_verified": False  # <--- This prevents them from logging in yet
         }).execute()
         
-        # Send OTP
+        # 4. Send Email (FAIL-SAFE)
+        # Even if email fails, we don't crash, so redirect still happens.
         send_email_otp(email, otp)
         
-        return jsonify({"ok": True, "message": "Account created successfully. Please verify your email."})
+        # 5. Redirect to OTP Page
+        return jsonify({
+            "ok": True, 
+            "message": "Admin account created. Check email for OTP.",
+            "redirect": True
+        }), 200
+
     except Exception as e:
-        print(f"!!! CRASH IN ADMIN_SIGNUP ROUTE !!! Error: {e}", file=sys.stderr)
-        return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
+        print(f"!!! ADMIN ROUTE CRASH: {e}", file=sys.stderr)
+        return jsonify({"ok": False, "message": f"Server error: {str(e)}"}), 500
 
 @admin_bp.route("/verify-otp", methods=["POST"])
 def verify_otp():

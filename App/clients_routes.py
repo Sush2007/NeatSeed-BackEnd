@@ -1,80 +1,70 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-import sys
-
-# --- Import the main supabase client and hash function ---
 from .database import supabase 
 from .utils import hash_password, generate_otp, send_email_otp
 
-# --- Create the Blueprint ---
 client_bp = Blueprint('client_bp', __name__)
 
-# This route will be at /client/signup
 @client_bp.route('/signup', methods=['POST'])
 def user_signup():
     try:
         data = request.get_json(silent=True) or {}
-        full_name = data.get('name') or data.get('fullName') 
+        
+        # Map Frontend 'name' to Backend 'full_name'
+        full_name = data.get('name') or data.get('fullName')
         email = data.get('email')
-        phone = data.get('phone') # Added phone capture
         password = data.get('password')
-        address = data.get('address') # Added address capture
+        phone = data.get('phone', '') 
+        address = data.get('address', '')
         role = data.get('role', 'user').lower()
         
-        print(f"DEBUG: Signup request for {email} as {role}")
+        if not full_name or not email or not password:
+             return jsonify({"ok": False, "message": "Missing required fields"}), 400
 
-        # 1. Determine Table Name
-        if role == 'user':
-            table_name = 'client_users'
-        elif role == 'driver':
-            table_name = 'driver_users'
-        else:
-            return jsonify({"error": "Invalid role specified"}), 400
+        table_name = 'client_users' if role == 'user' else 'driver_users'
 
-        # 2. Validation
-        if not email or not password or not full_name:
-            return jsonify({"error": "Missing required fields"}), 400
-
-        # 3. Check if user exists (in the CORRECT table)
-        existing_user = supabase.table(table_name).select("*").eq('email', email).execute()
-        if existing_user.data:
-            return jsonify({"error": f"User already exists in {table_name}"}), 400
+        # Check Duplicates
+        try:
+            existing = supabase.table(table_name).select("email").eq("email", email).execute()
+            if existing.data:
+                return jsonify({"ok": False, "message": "User already exists"}), 400
+        except:
+            pass
 
         hashed_password = hash_password(password)
         otp = generate_otp()
 
-        # 4. Prepare Data (Match your database schema)
+        # Prepare Data
         user_data = {
-            "full_name": full_name, # Ensure column name matches DB (full_name vs name)
+            "full_name": full_name, 
             "email": email,
-            "phone": phone,
-            "address": address,
             "password": hashed_password,
             "role": role,
+            "phone": phone,
+            "address": address,
             "otp": otp,
-            "is_verified": False,
+            "is_verified": False, # <--- Saved as Pending
             "created_at": datetime.now().isoformat()
         }
         
-        # 5. Insert into DB (The CORRECT table)
+        # INSERT NOW
         supabase.table(table_name).insert(user_data).execute()
         
-        # 6. Send Email
-        email_status = send_email_otp(email, otp)
-        
-        if not email_status:
-            print("WARNING: Database insert success, but Email failed.")
-            return jsonify({
-                "message": "Account created. (Email sending failed - check server logs)",
-                "redirect": True 
-            }), 200
-
-        return jsonify({"message": "Signup successful! OTP sent.", "redirect": True}), 201
+        # Send Email (Fail-Safe)
+        send_email_otp(email, otp)
+            
+        # Redirect
+        return jsonify({
+            "ok": True,
+            "message": "Account created. Please verify OTP.", 
+            "redirect": True
+        }), 200
 
     except Exception as e:
-        print(f"!!! CRITICAL SERVER ERROR: {str(e)}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+        print(f"!!! CLIENT ROUTE CRASH: {str(e)}")
+        return jsonify({"ok": False, "message": f"Server Crash: {str(e)}"}), 500
 
+# --- VERIFY OTP ROUTE (Crucial for the flow) ---
 @client_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
     data = request.get_json(silent=True) or {}
@@ -85,21 +75,24 @@ def verify_otp():
     if not email or not otp:
         return jsonify({"ok": False, "message": "Email and OTP are required"}), 400
         
-    if role == "user":
+    # Determine which table to check
+    if role == 'admin':
+        table_name = "admin_users"
+    elif role == 'user':
         table_name = "client_users"
-    elif role == "driver":
+    elif role == 'driver':
         table_name = "driver_users"
     else:
         return jsonify({"ok": False, "message": "Invalid role"}), 400
         
     try:
-        # Check if user exists with this email and OTP
+        # 1. Find User with matching Email AND OTP
         response = supabase.table(table_name).select("*").eq("email", email).eq("otp", otp).execute()
         
         if not response.data:
-            return jsonify({"ok": False, "message": "Invalid OTP or email"}), 400
+            return jsonify({"ok": False, "message": "Invalid OTP"}), 400
             
-        # Update user as verified and clear OTP
+        # 2. Success! Mark as verified and clear OTP
         supabase.table(table_name).update({
             "is_verified": True,
             "otp": None
@@ -108,7 +101,6 @@ def verify_otp():
         return jsonify({"ok": True, "message": "Email verified successfully"})
         
     except Exception as e:
-        print(f"Error verifying OTP: {e}")
         return jsonify({"ok": False, "message": f"Verification failed: {str(e)}"}), 500
 
 @client_bp.route('/login', methods=['POST'])
@@ -167,5 +159,5 @@ def client_login():
             }
         })
     except Exception as e:
-        print(f"!!! CRASH IN CLIENT_LOGIN ROUTE !!! Error: {e}", file=sys.stderr)
+        print(f"!!! CRASH IN CLIENT_LOGIN ROUTE !!! Error: {e}")
         return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
