@@ -14,7 +14,7 @@ client_bp = Blueprint('client_bp', __name__)
 def user_signup():
     try:
         data = request.get_json(silent=True) or {}
-        full_name = data.get('fullName') 
+        full_name = data.get('name') or data.get('fullName') 
         email = data.get('email')
         phone = data.get('phone') # Added phone capture
         password = data.get('password')
