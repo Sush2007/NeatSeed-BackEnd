@@ -1,10 +1,8 @@
 import hashlib
-import smtplib
 import random
 import string
 import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests 
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,36 +15,41 @@ def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
 
 def send_email_otp(recipient_email, otp):
-    sender_email = os.getenv("MAIL_USERNAME")
-    sender_password = os.getenv("MAIL_PASSWORD")
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("SENDER_EMAIL")
 
-    # 1. Check Variables
-    if not sender_email or not sender_password:
-        print(f"!!! ERROR: Creds missing. OTP for {recipient_email} is {otp}")
-        return False 
+    if not api_key:
+        print("!!! ERROR: BREVO_API_KEY missing.")
+        return False
 
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = recipient_email
-    msg['Subject'] = "NeatSeed Verification"
-    msg.attach(MIMEText(f"Your OTP is: {otp}", 'html'))
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+    
+    payload = {
+        "sender": {"email": sender_email, "name": "NeatSeed App"},
+        "to": [{"email": recipient_email}],
+        "subject": "NeatSeed Verification Code",
+        "htmlContent": f"""
+            <div style="font-family: Arial; padding: 20px;">
+                <h2>Verify your Account</h2>
+                <p>Your OTP is: <strong style="font-size: 24px; color: green;">{otp}</strong></p>
+            </div>
+        """
+    }
 
     try:
-        # 2. CONNECT WITH TIMEOUT (The Fix)
-        # We use Port 587 with STARTTLS (Better for Cloud Servers)
-        # timeout=5 ensures it fails FAST if it gets stuck, preventing Worker Timeout
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=5) as server:
-            server.ehlo() # Identify ourselves
-            server.starttls() # Secure the connection
-            server.ehlo() # Re-identify as encrypted
-            
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
-            
-        print(f"SUCCESS: Email sent to {recipient_email}")
-        return True
-
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 201:
+            print(f"SUCCESS: Email sent to {recipient_email}")
+            return True
+        else:
+            print(f"!!! BREVO ERROR: {response.text}")
+            return False
     except Exception as e:
-        # 3. Catch the error (now that we have a timeout, this will actually run!)
-        print(f"!!! EMAIL ERROR (Ignored): {str(e)}")
+        print(f"!!! NETWORK ERROR: {str(e)}")
         return False
