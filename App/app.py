@@ -14,7 +14,7 @@ app = Flask(__name__)
 # 2. Professional CORS Setup
 # allowing "Content-Type" and "Authorization" headers is crucial for your frontend to communicate
 CORS(app, resources={r"/*": {
-    "origins": ["https://neatseed-user.onrender.com", "https://neatseed.onrender.com"],
+    "origins": ["https://neatseed-user.onrender.com", "https://neatseed.onrender.com", "http://localhost:5173"],
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization"]
 }})
