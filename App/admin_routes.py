@@ -131,8 +131,25 @@ def admin_login():
         user_data = user.data[0]
         
         if not user_data.get("is_verified", False):
-            return jsonify({"ok": False, "message": "Please verify your email first"}), 403
+            # 1. Generate NEW OTP (since they are trying to login but can't)
+            new_otp = generate_otp()
+            
+            # 2. Update DB with new OTP
+            supabase.table("admin_users").update({
+                "otp": new_otp
+            }).eq("email", email).execute()
+            
+            # 3. Send the Email
+            send_email_otp(email, new_otp)
+            
+            # 4. Return 403 but with a SPECIAL FLAG so frontend knows to redirect
+            return jsonify({
+                "ok": False, 
+                "message": "Account not verified. A new OTP has been sent.",
+                "redirect_to_verify": True 
+            }), 403
         
+        # --- Verified User Login ---
         supabase.table("admin_users").update({
             "last_login": datetime.now().isoformat()
         }).eq("email", user_data["email"]).execute()
@@ -140,6 +157,7 @@ def admin_login():
         return jsonify({
             "ok": True, 
             "message": "Login successful",
+            "token": "admin-session-token", # Frontend needs this to stay logged in
             "user": {
                 "email": user_data["email"],
             }

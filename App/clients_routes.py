@@ -23,14 +23,6 @@ def user_signup():
 
         table_name = 'client_users' if role == 'user' else 'driver_users'
 
-        # Check Duplicates
-        try:
-            existing = supabase.table(table_name).select("email").eq("email", email).execute()
-            if existing.data:
-                return jsonify({"ok": False, "message": f"email already exists"}), 400
-        except:
-            pass
-
         hashed_password = hash_password(password)
         otp = generate_otp()
 
@@ -45,9 +37,22 @@ def user_signup():
             "is_verified": False, 
             "created_at": datetime.now().isoformat()
         }
-        
-        # INSERT NOW
-        supabase.table(table_name).insert(user_data).execute()
+
+        # Check Duplicates & Handle Unverified Users
+        try:
+            existing = supabase.table(table_name).select("*").eq("email", email).execute()
+            if existing.data:
+                existing_user = existing.data[0]
+                if existing_user.get('is_verified'):
+                    return jsonify({"ok": False, "message": "Email already exists"}), 400
+                else:
+                    supabase.table(table_name).update(user_data).eq("email", email).execute()
+            else:
+                # New User -> Insert
+                supabase.table(table_name).insert(user_data).execute()
+        except Exception as db_err:
+             print(f"Database Error: {db_err}")
+             return jsonify({"ok": False, "message": "Database error during signup"}), 500
         
         # Send Email (Fail-Safe)
         send_email_otp(email, otp)
@@ -75,8 +80,6 @@ def verify_otp():
         return jsonify({"ok": False, "message": "Email and OTP are required"}), 400
         
     # Determine which table to check
-    if role == 'admin':
-        table_name = "admin_users"
     elif role == 'user':
         table_name = "client_users"
     elif role == 'driver':
@@ -138,67 +141,42 @@ def client_login():
         if not user_data or not table_to_check:
             return jsonify({"ok": False, "message": "Invalid credentials"}), 401
             
-        # Check if verified
         if not user_data.get("is_verified", False):
-             return jsonify({"ok": False, "message": "Please verify your email first"}), 403
+            new_otp = generate_otp()
+            
+            # Update DB with new OTP using email (most reliable key)
+            supabase.table(table_to_check).update({
+                "otp": new_otp
+            }).eq("email", user_data["email"]).execute() 
+            
+            send_email_otp(user_data["email"], new_otp)
+            
+            # Tell Frontend to redirect to verification page
+            return jsonify({
+                "ok": False, 
+                "message": "Account not verified. A new OTP has been sent.",
+                "redirect_to_verify": True,
+                "email": user_data["email"],
+                "role": "user" if table_to_check == "client_users" else "driver"
+            }), 403 
         
-        # Update last_login
+        # --- FIX 3: Update last_login using email (More Robust) ---
         supabase.table(table_to_check).update({
             "last_login": datetime.now().isoformat()
-        }).eq("phone", user_data["phone"]).execute()
+        }).eq("email", user_data["email"]).execute() 
         
+        role_found = "user" if table_to_check == "client_users" else "driver"
+
         return jsonify({
             "ok": True, 
             "message": "Login successful",
+            "token": "client-session-token", # Token for frontend to save
             "user": {
-                "full_name": user_data["full_name"],
+                "full_name": user_data.get("full_name"),
                 "email": user_data.get("email"),
-                "phone": user_data["phone"],
-                "role": user_data.get("role")
+                "role": role_found
             }
         })
     except Exception as e:
         print(f"!!! CRASH IN CLIENT_LOGIN ROUTE !!! Error: {e}")
         return jsonify({"ok": False, "message": f"Internal server error. Log: {e}"}), 500
-
-@client_bp.route('/resend-otp', methods=['POST'])
-def resend_otp_route():
-    data = request.get_json(silent=True) or {}
-    email = data.get("email")
-    role = data.get("role", "").lower()
-
-    if not email:
-        return jsonify({"ok": False, "message": "Email is required"}), 400
-
-    # 1. Determine Table
-    if role == 'user':
-        table_name = 'client_users'
-    elif role == 'driver':
-        table_name = 'driver_users'
-    else:
-        return jsonify({"ok": False, "message": "Invalid role"}), 400
-
-    try:
-        # 2. Check if user exists
-        user = supabase.table(table_name).select("*").eq("email", email).execute()
-        if not user.data:
-            return jsonify({"ok": False, "message": "User not found"}), 404
-
-        # 3. Generate New OTP
-        new_otp = generate_otp()
-
-        # 4. Update DB with new OTP
-        supabase.table(table_name).update({
-            "otp": new_otp
-        }).eq("email", email).execute()
-
-        # 5. Send Email (using our fail-safe utility)
-        email_sent = send_email_otp(email, new_otp)
-
-        if email_sent:
-            return jsonify({"ok": True, "message": "OTP resent successfully"})
-        else:
-            return jsonify({"ok": True, "message": "OTP generated but email failed (check logs)"})
-    except Exception as e:
-        print(f"!!! CRASH IN RESEND_OTP ROUTE !!! Error: {e}")
-        return jsonify({"ok": False, "message": f"Internal server error. Log: {str(e)}"}), 500
