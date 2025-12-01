@@ -25,7 +25,7 @@ logger = app.logger
 allowed_origins = [
     "https://neatseed-user.onrender.com", 
     "https://neatseed.onrender.com", 
-    "http://localhost:5173"
+    "http://localhost:5173/"
 ]
 
 CORS(app, resources={r"/*": {
