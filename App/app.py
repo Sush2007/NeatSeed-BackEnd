@@ -16,29 +16,45 @@ from .clients_routes import client_bp
 app = Flask(__name__)
 
 # --- 2. Logging Configuration ---
-# This effectively replaces "Morgan" from Node.js. 
-# It ensures you see request details in your Render logs.
 logging.basicConfig(level=logging.INFO)
 logger = app.logger
 
 # --- 3. Professional CORS Setup ---
-allowed_origins = [
-    "https://neatseed-user.onrender.com", 
-    "https://neatseed.onrender.com", 
-    "http://localhost:5173/"
+# Define allowed origins
+base_origins = [
+    "https://neatseed-user.onrender.com",
+    "https://neatseed.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
-CORS(app, resources={r"/*": {
-    "origins": allowed_origins,
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"]
-}})
+# Allow additional origins from environment variable
+additional_origins = os.getenv("CORS_ORIGINS", "")
+if additional_origins:
+    base_origins.extend([origin.strip() for origin in additional_origins.split(",") if origin.strip()])
+
+logger.info(f"CORS Allowed Origins: {base_origins}")
+
+is_development = os.getenv("FLASK_ENV", "").lower() == "development"
+
+CORS(
+    app,
+    resources={r"/*": {"origins": base_origins}},
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+    expose_headers=["Content-Type", "Authorization"],
+    max_age=3600
+)
 
 # --- 4. Register Blueprints ---
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(client_bp, url_prefix='/client')
 
-# --- 5. The "Professional" Landing Page (HTML) ---
+# --- 7. The "Professional" Landing Page (HTML) ---
 # When you visit the base URL in a browser, you see this UI.
 @app.route('/')
 def root_dashboard():
@@ -71,7 +87,7 @@ def root_dashboard():
     """
     return make_response(html_content, 200)
 
-# --- 6. Programmatic Health Check (JSON) ---
+# --- 8. Programmatic Health Check (JSON) ---
 # Use this for uptime robots or frontend connectivity checks
 @app.route('/api/health')
 def health_check():
@@ -84,7 +100,7 @@ def health_check():
         }
     }), 200
 
-# --- 7. Production Execution Block ---
+# --- 9. Production Execution Block ---
 if __name__ == "__main__":
     # CRITICAL: Render provides a PORT env var. If you don't use it, the deploy fails.
     port = int(os.environ.get("PORT", 5000))
