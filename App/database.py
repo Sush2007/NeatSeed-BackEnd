@@ -11,4 +11,4 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("SUCCESS: Supabase client initialized.")
-    
+   
