@@ -28,3 +28,6 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+#Misc 
+Resolved-issues.txt
